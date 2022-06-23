@@ -1,0 +1,779 @@
+---
+title: "52414 - lab 2 "
+author: "52414"
+date: "25/5/2022"
+output: html_document
+---
+
+# *Lab 2: Text analysis, Sampling and inference*  
+<br/><br/>  
+  
+
+### Submission Instructions  
+
+
+  
+This lab will be submitted in pairs using GitHub (if you don't have a pair, please contact us).  
+Please follow the steps in the  [GitHub-Classroom Lab 2](https://classroom.github.com/a/F5YH9Lxr) to create your group's Lab 2 repository.  
+**Important: your team's name must be `FamilyName1_Name1_and_FamilyName2_Name2`**.  
+You can collaborate with your partner using the `git` environment; You can either make commits straight to the main repository, or create individual branches (recommended). 
+However, once done, be sure to merge your branches to main - you will be graded using the most recent main version - your last push and merge before the deadline.   
+**Please do not open/review other peoples' repositories - we will be notified by GitHub if you do.**
+
+Your final push should include this Rmd file (with your answers filled-in), together with the html file that is outputted automatically by knitr when you knit the Rmd. Anything else will be disregarded. In addition, please adhere to the following file format:    
+`Lab_2_FamilyName1_Name1_and_FamilyName2_Name2.Rmd/html`      
+
+<br/><br/>
+The only allowed libraries are the following (**please do not add your own without consulting the course staff**):
+```{r, include=FALSE}
+library(tidyverse) # This includes dplyr, stringr, ggplot2, .. 
+library(data.table)
+library(ggthemes)
+library(stringr)
+library(tidytext) 
+library(rvest)
+library(wordcloud)
+library(tm)
+options(scipen =999)
+library(readr)
+```
+<br/><br/>
+
+## Analysis of textual data and the `Wordle` game 
+    
+
+In this lab we will analyze textual data from the web. We will compute serveral statistics, and 
+also implement and solve the popular game [wordle](https://en.wikipedia.org/wiki/Wordle).   
+
+
+### General Guidance
+- Your solution should be submitted as a full `Rmd` report integrating text, code, figures and tables. You should also submit the `html` file generated from it. 
+For each question, describe first in the text of your solution what you're trying to do, then include the relevant code, 
+then the results (e.g. figures/tables) and then a textual description of them. 
+
+- In most questions the extraction/manipulation of relevant parts of the data-frame can be performed using commands from the `tidyverse` and `dplyr` R packages, such as `head`, `arrange`, `aggregate`, `group-by`, `filter`, `select`, `summaries`, `mutate` etc.
+
+- When displaying tables, show the relevant columns and rows with meaningful names, and describe the results. 
+
+- When displaying figures, make sure that the figure is clear to the reader, axis ranges are appropriate, labels for the axis , title and different curves/bars are displayed clearly (font sizes are large enough), a legend is shown when needed etc. 
+Explain and describe in text what is shown in the figure. 
+
+- In many cases, data are missing (e.g. `NA`). Make sure that all your calculations (e.g. taking the maximum, average, correlation etc.)
+take this into account. Specifically, the calculations should ignore the missing values to allow us to compute the desired results for the rest of the values (for example, using the option `na.rm = TRUE`). 
+
+- **Grading:** There are $17$ questions overall (plus a *bonus* sub-question). Each *sub-question* is worth $6$ points. (Total: $102$ points)
+
+
+### Questions: 
+
+#### PART 1 - MOBY-DICK
+
+1.a. Load the complete `Moby dick`  book from the [Gutenberg project](https://www.gutenberg.org) into `R`. The book is available [Here](https://www.gutenberg.org/files/2701/2701-h/2701-h.htm#link2HCH0004). 
+Extract the text from the html as a long string, and print the first line of the text in the file (starting with `The Project Gutenberg ...`)
+
+```{r}
+moby_dick <- html_text(read_html("https://www.gutenberg.org/files/2701/2701-h/2701-h.htm")) #read the html from the internet
+
+
+```  
+
+
+b. Split the text string into words, separated by spaces, commas (`,`), periods (`.`), and new line characters (`\n` and `\r`). How many words are there? 
+Compute and plot the distribution of lengths of words you got, and plot using a bar-plot. What are the `median`, `mean`, `longest` and `most common` word lengths?
+
+```{r}
+
+
+words_vec = strsplit(moby_dick, "\\W+")[[1]] #word_vectos
+word_freq_1 <-  as.data.frame.table(sort(table(unlist(words_vec))), decreasing = TRUE) #data frame
+med_freq = median(word_freq_1$Freq) #median
+avr_freq = mean(word_freq_1$Freq) #average
+len_vec = str_count(words_vec) #num of words
+median(len_vec)
+mean(len_vec)
+hist(len_vec)
+max(len_vec)
+sort(table(len_vec), decreasing = T)[1]
+
+```  
+
+
+**Note:** some of the "words" you will get will still contain non-english characters (e.g. numbers, `-`, `;` or other characters). Don't worry about it. We will parse the words further later when needed. 
+
+c. Count the words frequencies in the text - i.e. the number of times each unique word appears in the text.
+Show the top 10 most frequent words with their frequencies. Is the list of top words surprising? explain. 
+```{r}
+top_n(word_freq_1,10)
+```
+
+
+2.a. Split the book text into `chapters`, such that you obtain an array of strings, one per chapter. 
+Count and plot the number of words per each chapter (y-axis) vs. the chapter index (1,2,3.., on x-axis). 
+(each chapter is splitted to word in the same manner as in qu. 1). 
+**Hint:** Chapters begin with the string `CHAPTER` followed by a space and then the chapter's number and a period. For example: `CHAPTER 2.` is at the start of chapter 2. But beware - this pattern by itself is not enough to identify correctly all chapters starts and end. You will need to *look at the text* in order to decide what patterns to look for when splitting the data into chapters.
+
+Explanation- we cutting the epiloge and prolog and staying just with chapters. We chose specific word after reading the cutting area in the text.
+
+
+```{r}
+chapter_split <- str_split(moby_dick," —Whale Song.")#split the begining from chapters
+chapter_split[[1]] = as.list(chapter_split[[1]]) #charicter to list
+chapt_chapt = chapter_split[[1]]# saving the list in temp value
+chapt_chapt = chapt_chapt[2] # cutting the first index
+chapter_split <- str_split(chapt_chapt,"Epilogue") #same process to the end of the book.
+chapter_split [[1]] = as.list(chapter_split[[1]])
+chapt_chapt = chapter_split[[1]]
+chapt_chapt = chapt_chapt[1]
+chapter_split <- str_split(chapt_chapt,"  CHAPTER ") #cutting chapters to 135 peaces.
+chapter_split [[1]] = as.list(chapter_split[[1]])
+chapt_chapt = chapter_split[[1]] #cutting episode from the end
+chapt_chapt[1] = NULL
+chapters = chapt_chapt
+
+```
+
+```{r}
+y_axis = c()
+new_book = c()
+counter = 0
+for (chap in chapters) { #vec of length of each chapter
+  counter = counter + 1
+  a= str_split(chap, "\\W+")
+  y_axis[counter] = length(a[[1]])
+  new_book[counter] = a
+  
+}
+x_axis =c(1:135)
+x_axis = as.list(x_axis)
+
+plot(x_axis, y_axis)
+lines(x_axis, y_axis)
+```
+
+
+
+b. Write a function that receives as input a query word, and an array of strings representing the chapters. The function returns a vector of the `relative frequencies` of the word in each chapter. That is, if for example the word `time` appears six times in the first chapter, and there are overall 
+$3247$ words in this chapter, then the first entry in the output vector of the function will be $6/3247 \approx 0.0018$. 
+
+```{r}
+counter_1 = 0
+vec_odd = c()
+search_odd = function(q_word){ #check the freq of input string in each chapter
+  
+  for (chap in 1:135) {
+    for (word in new_book[[chap]]) {
+      if(word == q_word){
+        counter_1 = counter_1 + 1 
+      }
+    }
+    vec_odd[chap] = counter_1
+    counter_1 = 0
+    
+  }
+  
+  return(vec_odd / y_axis)
+}
+```
+
+Apply the function to the following words `Ahab`, `Moby`, `sea`. Plot for each one of them the trend, i.e. the frequency vs. chapter, with chapters in increasing orders. Do you see a different behavior for the different words? in which parts of the book are they frequent? 
+
+```{r}
+aha = search_odd('Ahab')
+moby = search_odd('Moby')
+sea = search_odd('sea')
+
+par(mfrow=c(1,3))
+plot(x_axis ,aha)
+
+plot(x_axis, moby)
+
+plot(x_axis, sea)
+
+
+```
+
+
+3.a. Suppose that Alice and Bob each choose independently and uniformly at random a single word from the book. That is, each of them chooses a random word instance from the book, taking into account that words have different frequencies (i.e. if for example the word `the` appears $1000$ times, and the word `Ishmael` appears only once, then it is $1000$-times more likely to choose the word `the` because each of its instances can be chosen). What is the probability that they will pick the same word? 
+Answer in two ways: 
+(i) Derive an exact formula for this probability as a function of the words relative frequencies, and compute the resulting value for the word freqeuencies you got for the book. 
+(ii) Simulate $B=100,000$ times the choice of Alice and Bob and use these simulations to estimate the probability that they chose the same word. 
+Explain your calculations in both ways and compare the results. Are they close to each other? 
+
+```{r}
+#(1)
+word_freq_1 <- sort(table(unlist(strsplit(moby_dick, "\\W+"))), decreasing = TRUE)
+word_freq_df =as.data.frame(word_freq_1)
+word_freq_double = (word_freq_1/222730)^2 #odd square
+
+word_freq_double = as.data.frame(word_freq_double) #data frame for double pick the same
+#word_freq_1 = as.data.frame(word_freq_1)
+sum(word_freq_double$Freq)#independence variable
+word_freq_df$Freq = word_freq_df$Freq/222730
+
+#(2)
+counter_match = 0
+for (i in 1:100000) {
+  samp = sample(word_freq_df$Var1, 2, prob =word_freq_df$Freq , replace = TRUE)
+  if(samp[[1]] == samp[[2]]){ #term for match between first and second choose
+    counter_match = counter_match + 1
+    
+  }
+}
+
+
+```
+```{r}
+counter_match/100000
+```
+#as we can see the results are pretty close which mean that the simulation close to the true and if we will make more simulation we will get closer to the actual result.#
+
+
+
+b. Suppose that instead, we took all **unique** words that appear in the book, and then Alice and Bob would choose each independenlty and uniformly at random a single word from the list of unique words. What would be the probability that they chose the same word in this case? is it lower, the same, or higher then the probability in (a.)? explain why. 
+
+
+cheching in manual wich index are just one time show from uni data we created
+```{r}
+uni_data = as.data.frame( word_freq_1)# data frame
+uni_data = filter(uni_data,Freq==1) #just unique words
+uni_data$Freq = (uni_data$Freq)/8555  #freq for unique words
+uni_data$Freq = (uni_data$Freq)^2 #freq for choosing unique words in a row
+sum(uni_data$Freq) #indepndnt vakues.
+#We will calculate it 1/n^2 * n which is 1/n like 3(1) exercise.
+
+```
+
+
+
+
+4.a. Extract from the book a list of all `five-letter` words. Keep only words that have only english letters. Convert all to lower-case. How many words are you left with? how many unique words? 
+Show the top 10 most frequent five-letter words with their frequencies.  
+
+```{r}
+only_5 <- c()
+all_words <- str_split(moby_dick, "\\W+")
+saparate_all <- str_split(all_words[[1]],"//W+")
+
+counter = 1
+for (i in saparate_all){
+  if (str_length(i) == 5){
+      only_5[counter] = i
+      counter = counter+1
+  }
+}
+
+
+counter = 1
+only_5_lower <- c()
+for (word in only_5){
+  only_5_lower[counter] = tolower(word)
+  counter = counter +1
+}
+
+only_5_lower <- data.frame(words = only_5_lower)
+only_5_lower <- subset(only_5_lower, grepl("^[A-Za-z]+$", words))
+
+only_5_word_freq <- sort(table(only_5_lower$words), decreasing = TRUE) / length(only_5_lower$words)
+head(only_5_word_freq,10)
+```
+
+
+b. Compute letter frequencies statistics of the five-letter words: 
+That is, for each of the five locations in the word (first, second,..), how many times each of the english letters `a`, `b`,...,`z` appeared in your (non-unique) list of words. Store the result in a $26-by-5$ table and show it as a heatmap. Which letter is most common in each location? Do you see a strong effect for the location? 
+```{r}
+index_vec <- c()
+counter = 1
+vec_count = 1
+for (spot in only_5_lower$words){
+  index_vec[vec_count] = str_split(spot,"")
+  vec_count = vec_count + 1
+}
+
+index_vec_1 <- c()
+index_vec_2 <- c()
+index_vec_3 <- c()
+index_vec_4 <- c()
+index_vec_5 <- c()
+
+counter_place = 1
+for (i in index_vec){
+  index_vec_1[counter_place] = i[1]
+  counter_place = counter_place + 1
+}
+
+First <- sort(table(unlist(index_vec_1)), decreasing = TRUE) / length(only_5_lower$words)
+
+counter_place_2 = 1
+
+for (i in index_vec){
+  index_vec_2[counter_place_2] = i[2]
+  counter_place_2 = counter_place_2 + 1
+}
+
+Second <- sort(table(unlist(index_vec_2)), decreasing = TRUE) / length(only_5_lower$words)
+second
+counter_place_3 = 1
+for (i in index_vec){
+  index_vec_3[counter_place_3] = i[3]
+  counter_place_3 = counter_place_3 + 1
+}
+
+Third <- sort(table(unlist(index_vec_3)), decreasing = TRUE) / length(only_5_lower$words)
+
+counter_place_4 = 1
+for (i in index_vec){
+  index_vec_4[counter_place_4] = i[4]
+  counter_place_4 = counter_place_4 + 1
+}
+
+Forth <- sort(table(unlist(index_vec_4)), decreasing = TRUE) / length(only_5_lower$words)
+
+counter_place_5 = 1
+for (i in index_vec){
+  index_vec_5[counter_place_5] = i[5]
+  counter_place_5 = counter_place_5 + 1
+}
+
+Fifth <- sort(table(unlist(index_vec_5)), decreasing = TRUE) / length(only_5_lower$words)
+
+
+```
+
+
+
+```{r}
+letter_mofa <- as.data.frame(cbind(First, Second, Third, Forth, Fifth))
+index_df <- letter_mofa / length(only_5_lower$words)
+matrix_freq <- as.matrix(index_df)
+heatmap(matrix_freq)
+letter_mofa
+```
+
+
+c. Consider the following random model for typing words: we have a $26-by-5$ table of probabilities $p_{ij}$ for i from $1$ to $5$, 
+and $j$ going over all $26$ possible English letters (assuming lower-case). (This table stores the parameters of the model).
+Here, $p_{ij}$ is the probability that the $i$-th letter in the word will be the character $j$. 
+Now, each letter $i$ is typed from a categorical distribution over the $26$ letters, with probability $p_{ij}$ of being the character $j$, and the letters are drawn independently for different values of $i$. 
+For example,  using $p_{5s}=0.3$ we will draw words such that the probability of the last character being `s` will be $0.3$. 
+
+For each five-letter word $w$ the likelihood of the word under this model is defined simply as the probability of observing this word when drawing a word according to this model, that is, if $w=(w_1,w_2,w_3,w_4,w_5)$ with $w_i$ denoting the $i$-th letter, then $Like(w ; p) = \prod_{i=1}^5 p_{i w_i}$. 
+
+Write a function that receives a $26-by-5$ table of probabilities and an array of words (strings), and computes the likelihood of each word according to this model. 
+
+Run the function to compute the likelihood of all unique five-letter words from the book, and show the top-10 words with the highest likelihood. 
+
+```{r}
+likley <- function(word){
+  numberstring_split <- strsplit(word, "")[[1]]
+  likley_probs <- c()
+  spot = 1
+  for (i in numberstring_split){
+    likley_probs[spot] <- letter_mofa[i,][spot] / sum(letter_mofa[spot])
+    spot = spot + 1
+  }
+  return(prod(as.data.frame(likley_probs)))
+}
+class(only_5_lower$words)
+mle <- as.data.frame(cbind(only_5_lower$words, lapply(only_5_lower$words, likley)))
+mle
+names(mle) <- c("Word", "MLE")
+mle <- as.data.frame(lapply(mle, unlist))
+new_data <- mle[order(mle$MLE, decreasing = TRUE),][1:10,]
+print(new_data)
+
+```
+
+
+
+
+#### PART 2 - WORDLE
+
+In `wordle`, the goal is to guess an unknown five-letter English word. At each turn, we guess a word, and get the following feedback: the locations at which our guess matches the unknown word (`correct`), the locations at which our guess has a letter that appears in the unknown word but in a different location (`wrong`), and the locations at which our guess contains a letter that is not present in the unknown word (`miss`).
+
+
+
+
+We supply to you a function called `wordle_match`, that receives as input a guess word and the true word (two strings), and returns an array of the same length indicating if there was a `correct` match (1), a match in the `wrong` location (-1), or a `miss` (0). For example: calling `match_words("honey", "bunny")` will yield the array: `[0, 0, 1, 0, 1]`, whereas calling `match_words("maple", "syrup")` will yield the array `[0, 0, -1, 0, 0]`. 
+
+**Note:** It is allowed for both the unknown word and the guess word to contain the same letter twice or more. In that case, we treat each letter in the guess as a `wrong` match if the same letter appears elsewhere in the unknown word. This is a bit different from the rules of the `wordle` game and is used for simplifcation here. 
+
+
+5.a. Download the list of five-letter words from [here](https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt). This list contains most common english five-letter words (each word appears once).  
+Compute and display the $26-by-5$ table of frequencies for this word list, in similar to qu. 4.b.
+Do you see major differences between the two tables? why? 
+
+```{r}
+redele = read_tsv("5leter.txt") #txt import
+redele_splt =  str_split(redele,"\\W+") #words only
+redele_splt = redele_splt[[1]] #from list of lists to list
+index_vec <- c()
+
+counter = 1
+vec_count = 1
+for (spot in redele_splt){ 
+  index_vec[vec_count] = str_split(spot,"")#saperate letters
+  vec_count = vec_count + 1
+}
+
+index_vc_1 <- c()
+index_vc_2 <- c()
+index_vc_3 <- c()
+index_vc_4 <- c()
+index_vc_5 <- c()
+
+counterplace = 1
+for (i in index_vec){# index for each letter
+  index_vc_1[counterplace] = i[1]
+  counterplace = counterplace + 1
+}
+
+First_1 <- sort(table(unlist(index_vc_1)), decreasing = TRUE) / length(redele_splt) #table of swq in i place and then same process in the other places
+
+counterplace_2 = 1
+
+for (i in index_vec){
+  index_vc_2[counterplace_2] = i[2]
+  counterplace_2 = counterplace_2 + 1
+}
+
+Second_1 <- sort(table(unlist(index_vc_2)), decreasing = TRUE) / length(redele_splt)
+
+counterplace_3 = 1
+for (i in index_vec){
+  index_vc_3[counterplace_3] = i[3]
+  counterplace_3 = counterplace_3 + 1
+}
+
+Third_1 <- sort(table(unlist(index_vc_3)), decreasing = TRUE) / length(redele_splt)
+
+counterplace_4 = 1
+for (i in index_vec){
+  index_vc_4[counterplace_4] = i[4]
+  counterplace_4 = counterplace_4 + 1
+}
+
+Forth_1 <- sort(table(unlist(index_vc_4)), decreasing = TRUE) / length(redele_splt)
+
+counterplace5 = 1
+for (i in index_vec){
+  index_vc_5[counterplace5] = i[5]
+  counterplace5 = counterplace5 + 1
+}
+
+Fifth_1 <- sort(table(unlist(index_vc_5)), decreasing = TRUE) / length(redele_splt)
+
+
+index_df_1 <- cbind(First_1, Second_1, Third_1, Forth_1, Fifth_1) #freq table
+index_df_1
+matrix_freq_1 <- as.matrix(index_df_1)
+heatmap(matrix_freq_1)
+
+
+
+```
+
+
+
+b. Write a function that recieves an array of guess words,an array of their corresponding matches to the unkwnon word (i.e. a two-dimensional array), and a `disctionary` - i.e. an array of legal English words. 
+The function should return all the words in the dictionary that are consistent with the results of the previous guesses. For example, if we guessed "maple" and our match was the array `[1, 0, -1, 0, 0]`, then we should keep only words that start with an `m`, has a `p` at a location different from $3$, and don't have `a`, `l` and `e`.
+When we have multiple guesses, our list of consistent words should be consistent with all of them, hence as we add more guesses, the list of consistent words will become shorter and shorter. <br>
+Run your function on the list of words from (a.), and with the guesses `c("south", "north")` and their corresponding matches: `c(-1, 1, 1, 0, 0)` and `c(0, 1, 0, 0, 0)`. Output the list of consistent words with these two guesses. 
+row = length(redele_splt) , ncol = 5
+which(substr(redele_splt,1,1)== "w")
+
+
+```{r}
+redele_splt[1] = "which" #missing word from the orugunal text.
+
+```
+
+```{r}
+
+#function 
+new_game <- function(dicts, guesses,matc) { 
+  final_lst <- dicts #final score
+  for (i in 1:length(guesses)) { #runing on the length of guesses list
+    for (j in 1:5) {
+      
+      if(matc[j + 5*(i-1)] == 1){
+        final_lst = final_lst[substr(final_lst, j,j) == substr(guesses[i],j,j)] #filter all the words that doesnt has specific letter in the specific place
+       
+        
+       }
+      else if(matc[j + 5*(i-1)] == 0){ #filter all the words that include the letter.
+    
+    
+        final_lst = final_lst[!(final_lst %in% str_subset(final_lst,substr(guesses[i],j,j)))]
+      # print(rem_lst)
+        
+    }
+     else { #filter all the words who has the letter in specific place and the filter words wothout the letter in out of index j
+      
+      final_lst = final_lst[substr(final_lst,j,j) != substr(guesses[i],j,j)]
+      final_lst = final_lst[(final_lst %in% str_subset(final_lst,substr(guesses[i],j,j)))]
+      
+     
+      
+       }
+     
+    }
+
+  
+  }  
+  #final_lst <- final_lst[final_lst != NULL]
+  return(final_lst)
+}
+
+length(new_game(redele_splt, c("north", "south"),c(c(-1,1,1,0,0), c(0,1,0,0,0))))
+new_game(redele_splt, c("north", "south"),c(c(-1,1,1,0,0), c(0,1,0,0,0)))
+
+```
+
+```{r}
+
+wordle_match <- function(guess, word)  # 1: correct location, -1: wrong location, 0: missing
+{
+  L <- nchar(guess)
+  match <- rep(0, L)
+  for(i in 1:L)
+  {
+    if(grepl(substr(guess, i, i), word, fixed=TRUE))
+      {match[i] = -1}
+    if(substr(guess, i, i) == substr(word, i, i))
+    {      match[i] = 1}
+  }
+  
+  return(match)
+
+}
+```
+
+
+
+
+
+6.a. Consider the following (rather naive) guessing strategy, called **strategy 1:** 
+- We start with a random word with each letter sampled uniformly and independently from the $26$ English letters. 
+- Then, at each turn, we look only at the previous perfect matches (`correct`) to the target word, and ignore matches at the `wrong` location and missing letters. At each place where there is a correct match, we use the correct letter, and at all other locations we keep sampling uniformly from the $26$ letters. We keep going until we get all the five letters correctly (and hence the word). 
+
+We are interested in the number of turns (guesses) needed until we get the correct word. 
+
+Implement a function that recieves as input the unknwon word, and implements this strategy. The output should be the number of turns it took to guess the word. The function should also record and print guess at each turn, as well as the match array , until the word is guessed correctly.  
+Run the function when the unknown word is "mouse", and show the results. 
+
+
+
+
+```{r}
+strategy1<- function(word){
+  random <- sample(letters,5)
+  result <- wordle_match(paste(random,collapse=""),word)
+  index_count <- 1
+  print(list("random"=paste(random,collapse=""), "match array"=result,"count"=index_count))
+  
+  while (sum(result) != 5) {
+    random <- ifelse(!result==1,sample(letters,sum(!result==1)),random)
+    result <- wordle_match(paste(random,collapse=""), word)
+    index_count <- index_count + 1
+    print(list("random"=paste(random,collapse=""), "match array"=wordle_match(paste(random,collapse=""), word),"index_count"=index_count))
+  }
+}
+
+
+strategy1(word=c("mouse"))
+
+
+
+```
+
+
+b. Write a mathematical formula for the distribution of the number of turns needed to guess the target word with this strategy. 
+**Hint:** The geometric distribution plays a role here. It is easier to compute the cumulative distribution function.  
+Use this formula to compute the expected number of turns for this strategy. 
+**Note:** The distribution has an infinite support (any positive number of turns has a positive probability), but high number of turns are very rare - you can neglect numbers above $10,000$ when computing the expectation.
+
+```{r}
+formula <- sum(unlist(lapply(1:10000, function(y) y*((1-(1-1/26)^y)^5-(1-(1-1/26)^(y-1))^5))))
+formula
+```
+
+
+c. Compute empirically the distribution of the number of turns using the following Monte-Carlo simulation:
+- Draw $B=1,000$ random   unknown words, unfiromly at random from the list of five-letter words in qu. 5. 
+- For each unknwon word, run the guessing strategy implemented in (a.) and record the number of turns 
+- Compute the average number of turns across all $B=100$ simulations. <br>
+Plot the empirical CDF along with the theoretical CDF from (b.) on the same plot. Do they match? 
+compare also the empirical expectation with the expectation computed in (b.). How close are they? 
+
+
+```{r}
+strategy1.2 <- function(word){
+  random <- sample(letters,5)
+  result <- wordle_match(paste(random,collapse=""),word)
+  index_count <- 1
+  while (sum(result) != 5) {
+    random <- ifelse(!result == 1,sample(letters,sum(!result == 1)),random)
+    result <- wordle_match(paste(random, collapse=""), word)
+    index_count <- index_count + 1
+  }
+  index_count
+}
+words <- sample(only_5_lower$words,1000)
+emp.dist<-sapply(words, strategy1.2)
+abs(mean(emp.dist) - formula)
+
+```
+
+
+
+
+
+In this section we used a while loop in order to check every time if the word we sampled randomly matchs the word we gave as input. In each iteration we checked if the letters match, and if so we added a "1" in our matching vector in the matching index. we did this until we got a sum of 5 in the vector - (1,1,1,1,1), which means, a perfect match!
+
+```{r}
+redele_splt = redele_splt[-5758]
+```
+
+
+7.a. Implement the following two additional strategies for guessing the word: 
+
+**Strategy 2:** 
+- At each stage, we guess the word with the highest likelihood (see Qu. 4.c.), **of the remaining words that are consistent with the previous guesses**. 
+- We keep guessing until obtaining the correct word. 
+
+
+```{r}
+wordle_match <- function(guess, word)  # 1: correct location, -1: wrong location, 0: missing
+{
+  L <- nchar(guess)
+  match <- rep(0, L)
+  for(i in 1:L)
+  {
+    if(grepl(substr(guess, i, i), word, fixed=TRUE))
+      {match[i] = -1}
+    if(substr(guess, i, i) == substr(word, i, i))
+    {      match[i] = 1}
+  }
+  
+  return(match)
+
+}
+```
+
+
+
+
+
+
+
+
+find_mouse <- function(mous, dicts) {
+counter_match = 0
+ans_lst = c(0,0,0,0,0)
+
+  while (any(ans_lst != c(1,1,1,1,1))) { #terms
+     counter_match = counter_match + 1  #counter for num of words
+     mle_2 <- (cbind(dicts, lapply(dicts, likley)))   #using 4c
+     mle_2 = as.data.frame(mle_2)
+     names(mle_2) <- c("Word", "frequ")
+     ind = which.max(mle_2$frequ)
+     guess_word <- mle_2$word[ind]
+     
+     
+     ans_lst = wordle_match(mle_dict$word[i], mous) #assist func
+
+     dicts = new_game(dicts, mle_dict$word[i], ans_lst ) #5b
+     }
+    }
+
+we had problem with likliy here and we didnt figured it out yet' but we thats the code that should work
+find_mouse("mouse", redele_splt)
+
+     
+     mle_dict <- as.data.frame(cbind(dicts, sapply(dicts, likley)))
+     names(mle_dict) <- c("Word", "MLE")
+     mle_dict <- as.data.frame(lapply(mle_dict, unlist))
+     mle_dict <- mle_dict[order(mle_dict$MLE, decreasing = TRUE),]
+     
+     guess_word <- mle_dict$word[1]
+     print(guess_word)
+     
+     ans_lst = wordle_match(mle_dict$word[i], mous)
+
+       dicts = new_game(dicts, mle_dict$word[i], ans_lst )
+     }
+    }
+
+
+
+
+
+
+**Strategy 3:** 
+The same as strategy 2, but at each stage we guess a random word sampled uniformly from all remaining consistent words (instead of guessing the word with the highest likelihood).
+
+Run both strategies with the unknown word "mouse", and show the guesses and the number of turns for them, in similar to qu. 6.a.
+
+
+```{r}
+
+starteg3 = function(dicts, mouse)  {
+  counter = 0
+  lst_ans = c(0,0,0,0,0)
+  while (any(lst_ans != c(1,1,1,1,1))) {
+    counter = 1
+    print(counter)
+    word = sample(dicts,1)
+    print(word)
+    lst_ans = wordle_match(word, mouse)
+    dicts = new_game(dicts, word, lst_ans)
+    
+  }
+  
+  
+}
+print(starteg3(redele_splt, "mouse"))
+```
+
+
+```{r}
+
+#find_mouse("mouse", mle_dict)
+
+```
+
+b. Run $B = 100$ simulations of the games, in similar to qu. 6.c. 
+That is, each time, sample a random unknown word,  run the two strategies $2$ and $3$, and record the number of turns needed to solve `wordle` for both of them. 
+
+
+- Plot the empirical CDFs of the number of guesses. How similar are they to each other? how similar are they to the CDF of strategy 1? What is the empirical means for both strategies?  
+
+
+c. (Bonus**) Can you divise a better guessing strategy? 
+Design and implemnt a different guessing strategy, run it on $B=100$ random simulations, show the empirical CDF and compute the empirical mean. Your strategy is considered `better` if it shows a significant reduction in the mean number of turns compared to the previous strategies (you should think how to show that the difference is significant)
+
+
+**Solution:**  
+
+[INSERT YOUR TEXT, CODE, PLOTS AND TABLE HERE, SEPERATED INTO SUB-QUESTIONS]
+
+
+
+# Helper function: 
+wordle_match <- function(guess, word)  # 1: correct location, -1: wrong location, 0: missing
+{
+  L <- nchar(guess)
+  match <- rep(0, L)
+  for(i in 1:L)
+  {
+    if(grepl(substr(guess, i, i), word, fixed=TRUE))
+      {match[i] = -1}
+    if(substr(guess, i, i) == substr(word, i, i))
+    {      match[i] = 1}
+  }
+  
+  return(match)
+}
+
+
+
